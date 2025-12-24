@@ -28,7 +28,6 @@ Run modern software on 20-year-old Macs!
 ### AltiVec LLM Framework (`altivec_llm/`)
 - `llm_transformer_altivec.c` - Full transformer with AltiVec
 - `sophia_subbrain.c` - Distributed AI node
-- `vec_perm_quantum_patterns.h` - Vector permute patterns
 - `Makefile.ppc` - PowerPC build configuration
 
 ### Crypto & Mining (Python 2.3 Compatible!)
@@ -50,9 +49,7 @@ Run modern software on 20-year-old Macs!
 ### Server Components
 | File | Description |
 |------|-------------|
-| `alticollapse_server.py` | AltiVec computation server |
 | `altivec_http_service.c` | HTTP service with AltiVec |
-| `altivec_quantum_server.c` | Quantum-inspired server |
 
 ## Building
 
