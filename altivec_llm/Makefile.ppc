@@ -1,0 +1,183 @@
+# Makefile for PowerPC G4/G5 AltiVec Quantum LLM Agent
+#
+# Target: Mac OS X Leopard (10.5) on PowerPC
+# Compiler: GCC 4.2 (stock) or GCC 12 (MacPorts)
+#
+# Usage:
+#   make -f Makefile.ppc              # Build with stock GCC
+#   make -f Makefile.ppc GCC=gcc-12   # Build with GCC 12
+#   make -f Makefile.ppc clean
+#   make -f Makefile.ppc install
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+# Compiler (default: stock GCC 4.2, override with GCC=gcc-12)
+GCC ?= gcc
+STRIP ?= strip
+
+# Target CPU (g4 for G4, 970 for G5)
+CPU ?= 970
+
+# Optimization flags
+CFLAGS = -O3 -mcpu=$(CPU) -maltivec -mabi=altivec -funroll-loops -ffast-math
+CFLAGS += -Wall -Wextra -Wno-unused-parameter
+
+# Libraries
+LDFLAGS = -framework Accelerate -lcurl -lpthread -lm
+
+# Source files
+SRC = ggml_altivec_quantum.c
+HEADERS = vec_perm_quantum_patterns.h
+
+# Output binary
+TARGET = altivec_llm_agent
+
+# Install location
+INSTALL_PREFIX ?= /usr/local
+INSTALL_BIN = $(INSTALL_PREFIX)/bin
+
+# ============================================================================
+# Build Targets
+# ============================================================================
+
+.PHONY: all clean install test benchmark
+
+all: $(TARGET)
+
+$(TARGET): $(SRC) $(HEADERS)
+	@echo "========================================="
+	@echo "Building AltiVec Quantum LLM Agent"
+	@echo "========================================="
+	@echo "Compiler: $(GCC)"
+	@echo "CPU Target: $(CPU)"
+	@echo "Flags: $(CFLAGS)"
+	@echo ""
+	$(GCC) $(CFLAGS) $(SRC) -o $(TARGET) $(LDFLAGS)
+	@echo ""
+	@echo "✓ Build complete: $(TARGET)"
+	@file $(TARGET)
+	@ls -lh $(TARGET)
+
+# Optimized build (strip symbols)
+release: $(SRC) $(HEADERS)
+	$(GCC) $(CFLAGS) -DNDEBUG $(SRC) -o $(TARGET) $(LDFLAGS)
+	$(STRIP) $(TARGET)
+	@echo "✓ Release build: $(TARGET) (stripped)"
+	@ls -lh $(TARGET)
+
+# Debug build
+debug: CFLAGS += -g -DDEBUG
+debug: $(TARGET)
+	@echo "✓ Debug build with symbols"
+
+# Clean build artifacts
+clean:
+	rm -f $(TARGET) *.o
+	@echo "✓ Cleaned build artifacts"
+
+# Install to system
+install: release
+	@echo "Installing to $(INSTALL_BIN)..."
+	sudo mkdir -p $(INSTALL_BIN)
+	sudo cp $(TARGET) $(INSTALL_BIN)/
+	sudo chmod 755 $(INSTALL_BIN)/$(TARGET)
+	@echo "✓ Installed to $(INSTALL_BIN)/$(TARGET)"
+
+# Uninstall from system
+uninstall:
+	sudo rm -f $(INSTALL_BIN)/$(TARGET)
+	@echo "✓ Uninstalled $(INSTALL_BIN)/$(TARGET)"
+
+# ============================================================================
+# Testing & Benchmarking
+# ============================================================================
+
+# Quick test (requires network connection)
+test: $(TARGET)
+	@echo "========================================="
+	@echo "Testing AltiVec Quantum LLM Agent"
+	@echo "========================================="
+	./$(TARGET) 9000 &
+	@sleep 2
+	@echo "✓ Agent started on port 9000"
+	@ps aux | grep $(TARGET) | grep -v grep
+
+# Benchmark AltiVec performance
+benchmark: $(TARGET)
+	@echo "========================================="
+	@echo "AltiVec Quantum Pattern Benchmark"
+	@echo "========================================="
+	./$(TARGET) --benchmark
+
+# ============================================================================
+# Architecture-Specific Builds
+# ============================================================================
+
+# G4 build (7450)
+g4: CPU=7450
+g4: $(TARGET)
+	@echo "✓ Built for PowerPC G4 (7450)"
+
+# G5 build (970)
+g5: CPU=970
+g5: $(TARGET)
+	@echo "✓ Built for PowerPC G5 (970)"
+
+# ============================================================================
+# Deployment Helpers
+# ============================================================================
+
+# Create deployment tarball
+package: release
+	@echo "Creating deployment package..."
+	mkdir -p altivec_llm_quantum
+	cp $(TARGET) altivec_llm_quantum/
+	cp vec_perm_quantum_patterns.h altivec_llm_quantum/
+	cp README.md altivec_llm_quantum/ 2>/dev/null || true
+	tar czf altivec_llm_quantum_$(CPU).tar.gz altivec_llm_quantum/
+	rm -rf altivec_llm_quantum/
+	@echo "✓ Created altivec_llm_quantum_$(CPU).tar.gz"
+	@ls -lh altivec_llm_quantum_$(CPU).tar.gz
+
+# ============================================================================
+# Cross-Compilation (from x86_64 Linux)
+# ============================================================================
+
+# Cross-compile from x86_64 Linux to PowerPC
+cross: GCC=powerpc-linux-gnu-gcc
+cross: LDFLAGS=-static -lm
+cross: $(TARGET)
+	@echo "✓ Cross-compiled for PowerPC Linux"
+	@file $(TARGET)
+
+# ============================================================================
+# Help
+# ============================================================================
+
+help:
+	@echo "AltiVec Quantum LLM Agent - Build System"
+	@echo ""
+	@echo "Targets:"
+	@echo "  all        - Build default target ($(CPU))"
+	@echo "  g4         - Build for PowerPC G4 (7450)"
+	@echo "  g5         - Build for PowerPC G5 (970)"
+	@echo "  release    - Optimized build (stripped)"
+	@echo "  debug      - Debug build with symbols"
+	@echo "  clean      - Remove build artifacts"
+	@echo "  install    - Install to $(INSTALL_BIN)"
+	@echo "  uninstall  - Remove from $(INSTALL_BIN)"
+	@echo "  test       - Run quick test"
+	@echo "  benchmark  - Benchmark AltiVec performance"
+	@echo "  package    - Create deployment tarball"
+	@echo "  cross      - Cross-compile from x86_64 Linux"
+	@echo ""
+	@echo "Variables:"
+	@echo "  GCC=<compiler>  - Override compiler (default: gcc)"
+	@echo "  CPU=<target>    - Override CPU target (default: 970)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make -f Makefile.ppc g4"
+	@echo "  make -f Makefile.ppc GCC=gcc-12 release"
+	@echo "  make -f Makefile.ppc install"
