@@ -111,6 +111,13 @@ gcc -o tls_shim openssl_tls12_shim.c -lssl -lcrypto
 - [claude-code-power8](https://github.com/Scottcjn/claude-code-power8) - Claude Code for POWER8
 - [llama-cpp-power8](https://github.com/Scottcjn/llama-cpp-power8) - llama.cpp for POWER8
 
+## Credits
+
+- **Scott (Scottcjn)** - Creator, architect, hardware lab, project direction
+- **Claude (Opus 4.1/4.5)** - Implementation assistance
+
+*Designed by Scott, coded with Claude*
+
 ## Attribution
 
 **A year of work went into this project.** If you use it, please give credit:
