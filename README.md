@@ -15,19 +15,13 @@ Run modern software on 20-year-old Macs!
 | `transformer_g4.c` | G4-optimized transformer |
 | `benchmark_transformer.c` | Performance benchmarks |
 
-### LLM Inference on G4
+### G4 Optimized Inference
 | File | Description |
 |------|-------------|
-| `g4_llm.c` | Basic LLM inference for G4 |
-| `g4_llm_demo.c` | LLM demonstration |
-| `g4_chat.c` | Interactive chat on G4 |
-| `sophia_chat_g4.c` | Sophia AI chat client |
-| `tiny_sophia_g4.c` | Minimal Sophia implementation |
-| `g4_beast_mode.c` | Maximum performance mode |
+| `g4_beast_mode.c` | Maximum performance collapsed inference |
 
 ### AltiVec LLM Framework (`altivec_llm/`)
 - `llm_transformer_altivec.c` - Full transformer with AltiVec
-- `sophia_subbrain.c` - Distributed AI node
 - `Makefile.ppc` - PowerPC build configuration
 
 ### Crypto & Mining (Python 2.3 Compatible!)
@@ -101,10 +95,6 @@ gcc -o tls_shim openssl_tls12_shim.c -lssl -lcrypto
 | iMac G4/G5 | 1GB+ | Works |
 | Mac mini G4 | 512MB+ | Limited |
 
-## Part of Sophiacord
-
-These tools are part of the Sophiacord distributed AI system. The G4/G5 Macs serve as vintage compute nodes alongside modern POWER8 servers.
-
 ## Performance Tips
 
 1. **Use AltiVec** - 4x speedup on vector operations
@@ -137,7 +127,7 @@ If this helped you, please:
 
 ## License
 
-MIT License - Free to use, but please keep the copyright notice and attribution.
+**AGPL v3** - Free to use, but any modifications or derivative works must also be open source under AGPL v3. If you use this in a network service, you must provide source code to users.
 
 ---
 
