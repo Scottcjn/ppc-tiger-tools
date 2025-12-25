@@ -119,10 +119,26 @@ These tools are part of the Sophiacord distributed AI system. The G4/G5 Macs ser
 - [claude-code-power8](https://github.com/Scottcjn/claude-code-power8) - Claude Code for POWER8
 - [llama-cpp-power8](https://github.com/Scottcjn/llama-cpp-power8) - llama.cpp for POWER8
 
+## Attribution
+
+**A year of work went into this project.** If you use it, please give credit:
+
+```
+PowerPC Tiger Tools by Scott (Scottcjn)
+https://github.com/Scottcjn/ppc-tiger-tools
+```
+
+If this helped you, please:
+- ⭐ **Star this repo** - It helps others find it
+- 📝 **Credit in your project** - Keep the attribution
+- 🔗 **Link back** - Share the love
+
 ## License
 
-MIT License
+MIT License - Free to use, but please keep the copyright notice and attribution.
 
 ---
 
 *"Your 2005 Mac still has value. Let it compute."*
+
+**A year of development, real hardware, electricity bills, and a dedicated lab went into this. Free for you to use - just give credit where it's due.**
