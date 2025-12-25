@@ -115,6 +115,8 @@ These tools are part of the Sophiacord distributed AI system. The G4/G5 Macs ser
 
 ## Related Projects
 
+- [ppc-compilers](https://github.com/Scottcjn/ppc-compilers) - **GCC 7, GCC 10, Perl 5.34 for PowerPC**
+- [rust-ppc-tiger](https://github.com/Scottcjn/rust-ppc-tiger) - Rust compiler for PowerPC
 - [llama-cpp-tigerleopard](https://github.com/Scottcjn/llama-cpp-tigerleopard) - llama.cpp for Tiger/Leopard
 - [claude-code-power8](https://github.com/Scottcjn/claude-code-power8) - Claude Code for POWER8
 - [llama-cpp-power8](https://github.com/Scottcjn/llama-cpp-power8) - llama.cpp for POWER8
