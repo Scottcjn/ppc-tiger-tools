@@ -42,7 +42,9 @@ def load_weight(weights_dir: str, name: str) -> np.ndarray:
         shape = tuple(struct.unpack('>I', f.read(4))[0] for _ in range(ndim))
 
         # Read data as big-endian float32
-        total_size = np.prod(shape)
+        total_size = 1
+        for s in shape:
+            total_size *= s
         data = f.read(total_size * 4)
         arr = np.frombuffer(data, dtype='>f4')
 
