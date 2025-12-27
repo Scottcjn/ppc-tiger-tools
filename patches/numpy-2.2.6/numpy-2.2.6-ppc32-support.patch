@@ -1,0 +1,59 @@
+--- NumPy 2.2.6 PowerPC (32-bit) Support Patch ---
+--- This patch adds support for 32-bit PowerPC (G4/G5) on Mac OS X
+--- NOTE: NumPy 2.x requires Python 3.10+
+
+diff -u a/meson_cpu/meson.build b/meson_cpu/meson.build
+--- a/meson_cpu/meson.build
++++ b/meson_cpu/meson.build
+@@ -91,6 +91,7 @@ min_features = {
+   'x86': [SSE2],
+   'x86_64': [SSE3],
+   'ppc64': [],
++  'ppc': [],  # 32-bit PowerPC (G4/G5) - AltiVec only, no VSX
+   's390x': [],
+   'arm': [],
+   'aarch64': [ASIMD],
+@@ -106,6 +107,7 @@ max_features_dict = {
+   'x86': X86_FEATURES,
+   'x86_64': X86_FEATURES,
+   'ppc64': PPC64_FEATURES,
++  'ppc': PPC64_FEATURES,  # 32-bit PPC can use same feature set (VSX tests will fail gracefully)
+   's390x': S390X_FEATURES,
+   'arm': ARM_FEATURES,
+   'aarch64': ARM_FEATURES,
+
+diff -u a/numpy/_core/src/common/npy_cpu_features.c b/numpy/_core/src/common/npy_cpu_features.c
+--- a/numpy/_core/src/common/npy_cpu_features.c
++++ b/numpy/_core/src/common/npy_cpu_features.c
+@@ -559,7 +559,7 @@ static void npy__cpu_init_features(void)
+
+ /***************** POWER ******************/
+
+-#elif defined(NPY_CPU_PPC64) || defined(NPY_CPU_PPC64LE)
++#elif defined(NPY_CPU_PPC64) || defined(NPY_CPU_PPC64LE) || defined(NPY_CPU_PPC)
+
+ #if defined(__linux__) || defined(__FreeBSD__)
+     #ifdef __FreeBSD__
+@@ -612,7 +612,14 @@ static void npy__cpu_init_features(void)
+     npy__cpu_have[NPY_CPU_FEATURE_VSX4] = (hwcap & PPC_FEATURE2_ARCH_3_1) != 0;
+ // TODO: AIX, OpenBSD
+ #else
+-    npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
++    /*
++     * Mac OS X PowerPC (G4/G5) and other non-Linux systems
++     * G4/G5 have AltiVec but not VSX (POWER7+)
++     * Only set VSX features for 64-bit PPC or if explicitly enabled
++     */
++    #if defined(NPY_CPU_PPC64) || defined(NPY_CPU_PPC64LE) || defined(NPY_HAVE_VSX)
++    npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
++    #endif
+     #if defined(NPY_CPU_PPC64LE) || defined(NPY_HAVE_VSX2)
+     npy__cpu_have[NPY_CPU_FEATURE_VSX2] = 1;
+     #endif
+@@ -622,6 +629,7 @@ static void npy__cpu_init_features(void)
+     #ifdef NPY_HAVE_VSX4
+     npy__cpu_have[NPY_CPU_FEATURE_VSX4] = 1;
+     #endif
++    /* 32-bit PPC (G4/G5 on Mac OS X) - no VSX, only AltiVec */
+ #endif
+ }
