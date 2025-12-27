@@ -1,0 +1,37 @@
+--- a/tools/clang/lib/CodeGen/CGOpenMPRuntime.cpp
++++ b/tools/clang/lib/CodeGen/CGOpenMPRuntime.cpp
+@@ -1,5 +1,9 @@
+ # LLVM 3.9.1 GCC 10 Compatibility Patches
+ 
++## Issue: Lambda parameter name conflicts with capture
++GCC 10 enforces stricter C++ rules - a lambda cannot have both a capture
++and a parameter with the same name.
++
+ ## Fix 1: CGOpenMPRuntime.cpp
+ Replace all instances of:
+   (CodeGenFunction &CGF, PrePostActionTy &)
+@@ -8,7 +12,8 @@
+ 
+ Apply with:
+   python -c "
+-content = open('CGOpenMPRuntime.cpp').read()
++import sys
++content = open(sys.argv[1]).read()
+ content = content.replace(
+     '](CodeGenFunction &CGF, PrePostActionTy &) {',
+     '](CodeGenFunction &InnerCGF, PrePostActionTy &) {'
+@@ -23,6 +28,10 @@ Apply with:
+   "
+ 
+ ## Fix 2: Lexer.cpp
+-Replace: const vector unsigned char
+-With:    const __vector unsigned char
++GCC 10 in C++ mode requires __vector instead of vector for AltiVec types.
++
++Replace:
++   const vector unsigned char
++With:
++   const __vector unsigned char
+ PATCH
+
+echo "Patch documentation saved"

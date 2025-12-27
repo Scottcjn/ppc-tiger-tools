@@ -1,0 +1,42 @@
+--- a/tools/clang/lib/CodeGen/CGOpenMPRuntime.cpp
++++ b/tools/clang/lib/CodeGen/CGOpenMPRuntime.cpp
+@@
+ GCC 10 Lambda Capture/Parameter Conflict Fix
+ ============================================
+
+ GCC 10 enforces stricter C++ rules where a lambda cannot have both a
+ capture and a parameter with the same name 'CGF'.
+
+ There are exactly 3 instances in CGOpenMPRuntime.cpp (LLVM 3.9.1) where
+ lambdas capture '&CGF' AND have 'CodeGenFunction &CGF' as a parameter.
+
+ Apply with sed (recommended):
+ -----------------------------
+
+ cd tools/clang/lib/CodeGen
+
+ # Fix line ~6076: BeginThenGen lambda
+ sed -i 's/\[&D, &CGF, &BasePointersArray/[&D, &BasePointersArray/g' CGOpenMPRuntime.cpp
+
+ # Fix line ~6124: EndThenGen lambda
+ sed -i 's/\[&CGF, &BasePointersArray/[&BasePointersArray/g' CGOpenMPRuntime.cpp
+
+ # Fix line ~6191: ThenGen lambda
+ sed -i 's/\[&D, &CGF, Device\]/[&D, Device]/g' CGOpenMPRuntime.cpp
+
+ Manual fixes:
+ -------------
+
+ Line ~6076:
+ BEFORE: auto &&BeginThenGen = [&D, &CGF, &BasePointersArray, &PointersArray,
+ AFTER:  auto &&BeginThenGen = [&D, &BasePointersArray, &PointersArray,
+
+ Line ~6124:
+ BEFORE: auto &&EndThenGen = [&CGF, &BasePointersArray, &PointersArray, &SizesArray,
+ AFTER:  auto &&EndThenGen = [&BasePointersArray, &PointersArray, &SizesArray,
+
+ Line ~6191:
+ BEFORE: auto &&ThenGen = [&D, &CGF, Device](CodeGenFunction &CGF, PrePostActionTy &) {
+ AFTER:  auto &&ThenGen = [&D, Device](CodeGenFunction &CGF, PrePostActionTy &) {
+
+ The CGF reference in the lambda body will use the parameter, not the capture.

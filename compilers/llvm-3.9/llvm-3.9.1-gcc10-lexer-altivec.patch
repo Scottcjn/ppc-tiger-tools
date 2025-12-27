@@ -1,0 +1,37 @@
+--- a/tools/clang/lib/Lex/Lexer.cpp
++++ b/tools/clang/lib/Lex/Lexer.cpp
+@@
+ GCC 10 AltiVec Vector Keyword Fix
+ =================================
+
+ In C++ mode with GCC 10, 'vector' as a type keyword conflicts with std::vector.
+ The AltiVec-style 'vector unsigned char' must use '__vector' instead.
+
+ Error message:
+   error: ISO C++ forbids declaration of 'type name' with no type
+
+ The fix: Replace 'const vector unsigned char' with 'const __vector unsigned char'
+
+ Apply with:
+ -----------
+
+ python3 -c "
+ content = open('Lexer.cpp').read()
+ content = content.replace('const vector unsigned char', 'const __vector unsigned char')
+ open('Lexer.cpp', 'w').write(content)
+ print('Fixed AltiVec vector keyword')
+ "
+
+ Or with sed:
+ ------------
+
+ sed -i 's/const vector unsigned char/const __vector unsigned char/g' Lexer.cpp
+
+ Location in file (around line 3270):
+ ------------------------------------
+
+ BEFORE:
+   const vector unsigned char *Ptr = reinterpret_cast<const vector unsigned char*>(Start);
+
+ AFTER:
+   const __vector unsigned char *Ptr = reinterpret_cast<const __vector unsigned char*>(Start);

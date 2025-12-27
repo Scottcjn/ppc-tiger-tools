@@ -1,0 +1,46 @@
+--- a/tools/clang/lib/Lex/HeaderMap.cpp
++++ b/tools/clang/lib/Lex/HeaderMap.cpp
+@@
+ GCC 10 strnlen Declaration Fix
+ ==============================
+
+ On older Mac OS X (10.4/10.5), strnlen may not be declared in the headers
+ used by GCC 10's libstdc++. This causes:
+
+   error: 'strnlen' was not declared in this scope; did you mean 'strlen'?
+
+ The fix: Add #include <cstring> at the top of HeaderMap.cpp, or add a
+ declaration/fallback for strnlen.
+
+ Apply with:
+ -----------
+
+ Option 1: Add include (preferred)
+
+ sed -i '1i #include <cstring>' HeaderMap.cpp
+
+ Option 2: Add strnlen fallback
+
+ After the includes, add:
+   #ifndef strnlen
+   #define strnlen(s, n) ({ \
+       const char *_s = (s); \
+       size_t _n = (n); \
+       const char *_p = (const char *)memchr(_s, 0, _n); \
+       _p ? (size_t)(_p - _s) : _n; \
+   })
+   #endif
+
+ Location in file:
+ -----------------
+
+ Line 158 (approximately):
+   unsigned Len = strnlen(Data, MaxLen);
+
+ Context:
+ --------
+
+ The getString() member function uses strnlen to safely get string length
+ with a maximum bound. On systems where strnlen is available in <cstring>,
+ the include fix works. Otherwise, the fallback macro provides equivalent
+ functionality.
