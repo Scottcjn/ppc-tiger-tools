@@ -10,9 +10,12 @@ C++ implementation of Samsung's Hierarchical Reasoning Model (HRM) for Sudoku, o
 | Python 2.5 + NumPy 1.6 (Accelerate) | 76.02s | 1.0x |
 | C++ (Accelerate BLAS only) | 16.56s | 4.6x |
 | C++ (AltiVec + Accelerate) | 15.56s | 4.9x |
-| **Python 3.7 + NumPy 1.16** | **13.03s** | **5.8x** |
+| Python 3.7 + NumPy 1.16 | 13.03s | 5.8x |
+| **Python 3.7 + NumPy 1.21 (patched)** | **12.84s** | **5.9x** |
 
 **Python 3.7 with modern NumPy beats hand-optimized C++ with AltiVec!**
+
+NumPy 1.21.6 required a [PowerPC support patch](../patches/numpy-1.21.6/) to build on 32-bit PowerPC.
 
 ## Requirements
 
