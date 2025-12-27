@@ -1,0 +1,44 @@
+--- LLVM 3.9.1 strnlen Polyfill for Mac OS X 10.5
+--- =============================================
+---
+--- Mac OS X 10.5 (Leopard) does not have strnlen() in the C library.
+--- It was added in Mac OS X 10.7 (Lion).
+---
+--- Add this polyfill to the top of files that use strnlen:
+---
+---   tools/llvm-pdbdump/LLVMOutputStyle.cpp
+---   tools/obj2yaml/macho2yaml.cpp
+---   tools/clang/lib/Lex/HeaderMap.cpp
+---   lib/ObjectYAML/MachOYAML.cpp
+---   tools/llvm-objdump/MachODump.cpp (also has xar issues)
+---
+--- Apply by adding this to the top of each file:
+
+#include <cstring>
+#if defined(__APPLE__) && !defined(__MAC_10_7)
+// strnlen was added in Mac OS X 10.7 (Lion)
+// Provide a polyfill for older systems
+static inline size_t _strnlen_compat(const char *s, size_t maxlen) {
+    const char *p = (const char *)memchr(s, '\0', maxlen);
+    return p ? (size_t)(p - s) : maxlen;
+}
+#define strnlen _strnlen_compat
+#endif
+
+--- Apply with sed:
+---
+--- for file in tools/llvm-pdbdump/LLVMOutputStyle.cpp \
+---             tools/obj2yaml/macho2yaml.cpp \
+---             tools/clang/lib/Lex/HeaderMap.cpp \
+---             lib/ObjectYAML/MachOYAML.cpp; do
+---     sed -i '' '1i\
+--- #include <cstring>\
+--- #if defined(__APPLE__) && !defined(__MAC_10_7)\
+--- static inline size_t _strnlen_compat(const char *s, size_t maxlen) {\
+---     const char *p = (const char *)memchr(s, '\\'\\0\\'', maxlen);\
+---     return p ? (size_t)(p - s) : maxlen;\
+--- }\
+--- #define strnlen _strnlen_compat\
+--- #endif\
+--- ' "$file"
+--- done

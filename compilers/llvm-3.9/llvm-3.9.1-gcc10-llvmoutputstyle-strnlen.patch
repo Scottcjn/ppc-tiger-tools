@@ -1,0 +1,21 @@
+--- a/tools/llvm-pdbdump/LLVMOutputStyle.cpp
++++ b/tools/llvm-pdbdump/LLVMOutputStyle.cpp
+@@
+ GCC 10 strnlen Declaration Fix for LLVMOutputStyle.cpp
+ ======================================================
+
+ Same issue as HeaderMap.cpp - strnlen may not be declared in older
+ Mac OS X headers used by GCC 10's libstdc++.
+
+ Error message:
+   error: 'strnlen' was not declared in this scope
+
+ Apply with:
+ -----------
+
+ sed -i '1i #include <cstring>' tools/llvm-pdbdump/LLVMOutputStyle.cpp
+
+ Location in file (around line 735):
+ ------------------------------------
+
+   // strnlen used to get string length safely

@@ -1,0 +1,18 @@
+--- LLVM 3.9.1 GCC 10 Compatibility Patches ---
+These patches fix compilation issues when building LLVM 3.9.1 with GCC 10.
+
+1. CGOpenMPRuntime.cpp - Lambda capture/parameter conflict
+   GCC 10 is stricter about having same name in capture and parameter.
+   Fix: Remove &CGF from capture lists where CGF is a lambda parameter.
+
+   Lines to modify (remove &CGF from captures):
+   - Line 6076: [&D, &CGF, &BasePointersArray, -> [&D, &BasePointersArray,
+   - Line 6124: [&CGF, &BasePointersArray, -> [&BasePointersArray,
+   - Line 6191: [&D, &CGF, Device] -> [&D, Device]
+
+2. Lexer.cpp - AltiVec vector keyword in C++
+   The 'vector' keyword conflicts in C++ mode.
+   Note: This may compile fine on native PPC with GCC 10.
+
+3. HeaderMap.cpp - strnlen not declared
+   Add: #include <cstring> or define strnlen if missing.
