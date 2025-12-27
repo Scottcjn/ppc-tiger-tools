@@ -1,0 +1,22 @@
+--- Python 3.9.19 Mac OS X Leopard (10.5) Compatibility Patch ---
+--- This patch fixes pthread_threadid_np which is only available on 10.6+
+--- pthread_threadid_np was introduced in Snow Leopard (10.6, Darwin 10)
+
+diff -u a/Python/thread_pthread.h b/Python/thread_pthread.h
+--- a/Python/thread_pthread.h
++++ b/Python/thread_pthread.h
+@@ -341,9 +341,13 @@ unsigned long
+ PyThread_get_thread_native_id(void)
+ {
+     if (!initialized)
+         PyThread_init_thread();
+-#if defined(__APPLE__)
++#if defined(__APPLE__) && defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+     uint64_t native_id;
+     (void) pthread_threadid_np(NULL, &native_id);
++#elif defined(__APPLE__)
++    /* Fallback for macOS < 10.6 (Leopard) - use pthread_self */
++    unsigned long native_id = (unsigned long)pthread_self();
+ #elif defined(__linux__)
+     pid_t native_id;
+     native_id = syscall(SYS_gettid);
