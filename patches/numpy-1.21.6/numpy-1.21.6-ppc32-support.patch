@@ -1,0 +1,90 @@
+--- NumPy 1.21.6 PowerPC (32-bit) Support Patch ---
+--- This patch adds support for 32-bit PowerPC (G4/G5) on Mac OS X
+--- Required for building NumPy 1.21.6 on PowerPC Macs
+
+diff -u a/numpy/core/include/numpy/numpyconfig.h b/numpy/core/include/numpy/numpyconfig.h
+--- a/numpy/core/include/numpy/numpyconfig.h
++++ b/numpy/core/include/numpy/numpyconfig.h
+@@ -29,6 +29,10 @@
+     #elif defined(__arm64__)
+         #define NPY_SIZEOF_LONGDOUBLE         8
+         #define NPY_SIZEOF_COMPLEX_LONGDOUBLE 16
++    #elif defined(__ppc__) || defined(__ppc64__) || defined(__powerpc__) || defined(__powerpc64__)
++        /* PowerPC G4/G5 uses IBM double-double 128-bit long double */
++        #define NPY_SIZEOF_LONGDOUBLE         16
++        #define NPY_SIZEOF_COMPLEX_LONGDOUBLE 32
+     #else
+         #error "unknown architecture"
+     #endif
+
+diff -u a/numpy/core/src/common/npy_cpu_features.c.src b/numpy/core/src/common/npy_cpu_features.c.src
+--- a/numpy/core/src/common/npy_cpu_features.c.src
++++ b/numpy/core/src/common/npy_cpu_features.c.src
+@@ -466,7 +466,7 @@
+
+ /***************** POWER ******************/
+
+-#elif defined(NPY_CPU_PPC64) || defined(NPY_CPU_PPC64LE)
++#elif defined(NPY_CPU_PPC64) || defined(NPY_CPU_PPC64LE) || defined(NPY_CPU_PPC)
+
+ #ifdef __linux__
+     #include <sys/auxv.h>
+@@ -497,11 +497,17 @@
+     npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
+ // TODO: AIX, FreeBSD
+ #else
+-    npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
+-    #if defined(NPY_CPU_PPC64LE) || defined(NPY_HAVE_VSX2)
++    /*
++     * Mac OS X PowerPC (G4/G5) and other non-Linux systems
++     * G4/G5 have AltiVec but not VSX (POWER7+)
++     * We don't set VSX features since they're not available
++     */
++    #if defined(NPY_CPU_PPC64LE) || defined(NPY_HAVE_VSX2)
++    npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
+     npy__cpu_have[NPY_CPU_FEATURE_VSX2] = 1;
++    #elif defined(NPY_CPU_PPC64) || defined(NPY_HAVE_VSX)
++    npy__cpu_have[NPY_CPU_FEATURE_VSX]  = 1;
+     #endif
++    /* 32-bit PPC (G4/G5 on Mac OS X) - no VSX, only AltiVec */
+     #ifdef NPY_HAVE_VSX3
+     npy__cpu_have[NPY_CPU_FEATURE_VSX3] = 1;
+     #endif
+
+diff -u a/numpy/distutils/ccompiler_opt.py b/numpy/distutils/ccompiler_opt.py
+--- a/numpy/distutils/ccompiler_opt.py
++++ b/numpy/distutils/ccompiler_opt.py
+@@ -221,6 +221,7 @@
+         x64 = "SSE SSE2 SSE3",
+         ppc64 = '', # play it safe
+         ppc64le = "VSX VSX2",
++        ppc = '', # 32-bit PowerPC (G4/G5) - AltiVec only, no VSX
+         armhf = '', # play it safe
+         aarch64 = "NEON NEON_FP16 NEON_VFPV4 ASIMD"
+     )
+@@ -444,7 +445,7 @@
+             AVX512_ICL = {}
+         )
+
+-        on_power = self.cc_on_ppc64le or self.cc_on_ppc64
++        on_power = self.cc_on_ppc64le or self.cc_on_ppc64 or self.cc_on_ppc
+         if on_power:
+             partial = dict(
+                 VSX = dict(
+@@ -908,6 +909,7 @@
+             ("cc_on_x86",      ".*(win32|x86|i386|i686).*"),
+             ("cc_on_ppc64le",  ".*(powerpc|ppc)64(el|le).*"),
+             ("cc_on_ppc64",    ".*(powerpc|ppc)64.*"),
++            ("cc_on_ppc",      ".*(powerpc|ppc|Power Macintosh).*"),  # 32-bit PPC (G4/G5)
+             ("cc_on_aarch64",  ".*(aarch64|arm64).*"),
+             ("cc_on_armhf",    ".*arm.*"),
+             # undefined platform
+@@ -976,7 +978,7 @@
+             self.cc_is_gcc = True
+
+         self.cc_march = "unknown"
+-        for arch in ("x86", "x64", "ppc64", "ppc64le", "armhf", "aarch64"):
++        for arch in ("x86", "x64", "ppc64", "ppc64le", "ppc", "armhf", "aarch64"):
+             if getattr(self, "cc_on_" + arch):
+                 self.cc_march = arch
+                 break
