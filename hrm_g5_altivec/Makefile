@@ -4,7 +4,7 @@
 # Note: -O2 and -O3 cause bus errors on G5 due to auto-vectorization
 # -O1 is the highest safe optimization level
 CXX = g++-10
-CXXFLAGS = -O1 -mcpu=970 -mtune=970 -Wall
+CXXFLAGS = -O1 -mcpu=970 -mtune=970 -maltivec -Wall
 LDFLAGS = -framework Accelerate
 
 TARGET = hrm_inference

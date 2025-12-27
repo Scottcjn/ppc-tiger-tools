@@ -1,10 +1,12 @@
 /*
- * HRM Inference for PowerPC G5 - Accelerate BLAS Optimized
+ * HRM Inference for PowerPC G5 - AltiVec + Accelerate BLAS
  * Samsung Hierarchical Reasoning Model for Sudoku
  *
  * Compile with GCC 10:
- *   g++-10 -O3 -mcpu=970 -mtune=970 -ffast-math \
+ *   g++-10 -O1 -mcpu=970 -mtune=970 -maltivec \
  *          -framework Accelerate -o hrm_inference hrm_inference.cpp
+ *
+ * Note: -O2/-O3 cause bus errors due to auto-vectorization alignment issues
  */
 
 #include <cstdio>
@@ -15,6 +17,130 @@
 
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h>
+#endif
+
+// AltiVec support for PowerPC G5
+#if defined(__ALTIVEC__) && defined(__APPLE__)
+#include <altivec.h>
+#define USE_ALTIVEC 1
+
+// Aligned memory allocation (16-byte for AltiVec)
+inline float* alloc_aligned(size_t count) {
+    // valloc returns page-aligned memory (4096 bytes, way more than 16)
+    float* ptr = (float*)valloc(count * sizeof(float));
+    memset(ptr, 0, count * sizeof(float));
+    return ptr;
+}
+
+// AltiVec dot product - 4 floats at a time
+inline float dot_product_altivec(const float* a, const float* b, int size) {
+    vector float sum_vec = vec_splats(0.0f);
+    int i = 0;
+
+    // Process 4 floats per iteration (16 bytes = 1 AltiVec register)
+    for (; i + 3 < size; i += 4) {
+        vector float va = vec_ld(0, a + i);
+        vector float vb = vec_ld(0, b + i);
+        sum_vec = vec_madd(va, vb, sum_vec);  // sum += a * b
+    }
+
+    // Horizontal sum: add all 4 lanes together
+    float result[4] __attribute__((aligned(16)));
+    vec_st(sum_vec, 0, result);
+    float sum = result[0] + result[1] + result[2] + result[3];
+
+    // Scalar cleanup for remaining elements
+    for (; i < size; i++) {
+        sum += a[i] * b[i];
+    }
+    return sum;
+}
+
+// AltiVec sum of squares (for RMS norm)
+inline float sum_squares_altivec(const float* x, int size) {
+    vector float sum_vec = vec_splats(0.0f);
+    int i = 0;
+
+    for (; i + 3 < size; i += 4) {
+        vector float vx = vec_ld(0, x + i);
+        sum_vec = vec_madd(vx, vx, sum_vec);  // sum += x * x
+    }
+
+    float result[4] __attribute__((aligned(16)));
+    vec_st(sum_vec, 0, result);
+    float sum = result[0] + result[1] + result[2] + result[3];
+
+    for (; i < size; i++) {
+        sum += x[i] * x[i];
+    }
+    return sum;
+}
+
+// AltiVec scale vector (for RMS norm)
+inline void scale_vector_altivec(float* out, const float* x, float scale, int size) {
+    vector float scale_vec = vec_splats(scale);
+    int i = 0;
+
+    for (; i + 3 < size; i += 4) {
+        vector float vx = vec_ld(0, x + i);
+        vector float result = vec_madd(vx, scale_vec, vec_splats(0.0f));
+        vec_st(result, 0, out + i);
+    }
+
+    for (; i < size; i++) {
+        out[i] = x[i] * scale;
+    }
+}
+
+// AltiVec vector addition
+inline void add_vectors_altivec(float* out, const float* a, const float* b, int size) {
+    int i = 0;
+
+    for (; i + 3 < size; i += 4) {
+        vector float va = vec_ld(0, a + i);
+        vector float vb = vec_ld(0, b + i);
+        vec_st(vec_add(va, vb), 0, out + i);
+    }
+
+    for (; i < size; i++) {
+        out[i] = a[i] + b[i];
+    }
+}
+
+// AltiVec find maximum value (for softmax)
+inline float find_max_altivec(const float* x, int size) {
+    if (size < 4) {
+        float max_val = x[0];
+        for (int i = 1; i < size; i++) {
+            if (x[i] > max_val) max_val = x[i];
+        }
+        return max_val;
+    }
+
+    vector float max_vec = vec_ld(0, x);
+    int i = 4;
+
+    for (; i + 3 < size; i += 4) {
+        vector float vx = vec_ld(0, x + i);
+        max_vec = vec_max(max_vec, vx);
+    }
+
+    float result[4] __attribute__((aligned(16)));
+    vec_st(max_vec, 0, result);
+    float max_val = result[0];
+    for (int j = 1; j < 4; j++) {
+        if (result[j] > max_val) max_val = result[j];
+    }
+
+    // Scalar cleanup
+    for (; i < size; i++) {
+        if (x[i] > max_val) max_val = x[i];
+    }
+    return max_val;
+}
+
+#else
+#define USE_ALTIVEC 0
 #endif
 
 // Model configuration
@@ -43,9 +169,14 @@ static float rope_cos[SEQ_LEN][HEAD_DIM];
 static float rope_sin[SEQ_LEN][HEAD_DIM];
 
 inline float* alloc_float(size_t count) {
+#if USE_ALTIVEC
+    // Use aligned allocation for AltiVec
+    return alloc_aligned(count);
+#else
     float* ptr = (float*)malloc(count * sizeof(float));
     memset(ptr, 0, count * sizeof(float));
     return ptr;
+#endif
 }
 
 float* load_weight(const char* weights_dir, const char* name, int* out_size) {
@@ -146,6 +277,11 @@ Weights load_all_weights(const char* weights_dir) {
 }
 
 void rms_norm(float* out, const float* x, int size) {
+#if USE_ALTIVEC
+    float sum = sum_squares_altivec(x, size);
+    float rms = 1.0f / sqrtf(sum / size + 1e-5f);
+    scale_vector_altivec(out, x, rms, size);
+#else
     float sum = 0.0f;
     for (int i = 0; i < size; i++) {
         sum += x[i] * x[i];
@@ -154,22 +290,32 @@ void rms_norm(float* out, const float* x, int size) {
     for (int i = 0; i < size; i++) {
         out[i] = x[i] * rms;
     }
+#endif
 }
 
 void softmax(float* x, int size) {
+#if USE_ALTIVEC
+    float max_val = find_max_altivec(x, size);
+#else
     float max_val = x[0];
     for (int i = 1; i < size; i++) {
         if (x[i] > max_val) max_val = x[i];
     }
+#endif
+    // exp() and sum - keep scalar (vexpf not available in AltiVec)
     float sum = 0.0f;
     for (int i = 0; i < size; i++) {
         x[i] = expf(x[i] - max_val);
         sum += x[i];
     }
     float inv_sum = 1.0f / sum;
+#if USE_ALTIVEC
+    scale_vector_altivec(x, x, inv_sum, size);
+#else
     for (int i = 0; i < size; i++) {
         x[i] *= inv_sum;
     }
+#endif
 }
 
 // Matrix multiply using Accelerate BLAS - THIS IS THE KEY OPTIMIZATION
@@ -181,9 +327,13 @@ void matmul(float* C, const float* A, const float* B, int M, int N, int K) {
 }
 
 void add_vectors(float* out, const float* a, const float* b, int size) {
+#if USE_ALTIVEC
+    add_vectors_altivec(out, a, b, size);
+#else
     for (int i = 0; i < size; i++) {
         out[i] = a[i] + b[i];
     }
+#endif
 }
 
 void apply_rope(float* q, float* k, int seq_len, int num_heads, int head_dim) {
@@ -211,11 +361,15 @@ void apply_rope(float* q, float* k, int seq_len, int num_heads, int head_dim) {
 }
 
 float dot_product(const float* a, const float* b, int size) {
+#if USE_ALTIVEC
+    return dot_product_altivec(a, b, size);
+#else
     float result = 0.0f;
     for (int i = 0; i < size; i++) {
         result += a[i] * b[i];
     }
     return result;
+#endif
 }
 
 void attention(float* out, const float* x, const float* qkv_w, const float* o_w,
@@ -381,7 +535,11 @@ void print_grid(const int* grid, const char* title) {
 
 int main(int argc, char** argv) {
     printf("============================================================\n");
+#if USE_ALTIVEC
+    printf("Samsung HRM Sudoku - PowerPC G5 C++ (AltiVec + Accelerate)\n");
+#else
     printf("Samsung HRM Sudoku - PowerPC G5 C++ (Accelerate BLAS)\n");
+#endif
     printf("============================================================\n");
 
     const char* weights_dir = "weights_be";
