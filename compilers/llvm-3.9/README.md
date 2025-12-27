@@ -1,6 +1,37 @@
-# LLVM 3.9.1 GCC 10 Compatibility Patches
+# LLVM 3.9.1 for PowerPC Mac OS X Leopard
 
 These patches fix compilation issues when building LLVM 3.9.1 with GCC 10.x on Mac OS X Leopard (10.5).
+
+## Pre-Built Binaries
+
+**Download ready-to-use binaries:**
+
+| File | Size | Contents |
+|------|------|----------|
+| `llvm-3.9.1-ppc-leopard-bin.tar.gz` | 96 MB | 56 LLVM/Clang binaries |
+
+### Quick Install
+
+```bash
+# Download and extract
+cd ~
+tar -xzf llvm-3.9.1-ppc-leopard-bin.tar.gz
+
+# Test
+~/llvm-3.9-build/bin/clang --version
+
+# Optional: Add to PATH
+export PATH=$HOME/llvm-3.9-build/bin:$PATH
+```
+
+### Included Tools (56 total)
+
+- **Compilers**: clang, clang++, clang-3.9
+- **Code Gen**: llc, lli, opt
+- **Archivers**: llvm-ar, llvm-lib, llvm-link
+- **Analysis**: llvm-nm, llvm-objdump, llvm-dis, llvm-bcanalyzer
+- **Debug**: llvm-dwarfdump, llvm-dsymutil, bugpoint
+- And 40+ more tools
 
 ## Successfully Built
 
