@@ -139,20 +139,67 @@ class NumpyLLM:
         print(f"Loading weights from: {weights_path}")
         t0 = time.time()
 
-        # Use mmap_mode='r' to avoid loading entire file into RAM
-        data = np.load(weights_path, allow_pickle=True, mmap_mode='r')
-        # Load weights lazily - just get references
-        self.weight_names = [k for k in data.files if not k.startswith('__')]
-        self._data = data
         self.weights = {}
+        self._data = None
+        self.weight_names = []
 
-        # Try to extract metadata
-        if '__metadata__' in data.files:
-            meta = str(data['__metadata__'])
-            print(f"Metadata: {meta[:200]}...")
+        # Check if weights_path is a directory (individual .npy files)
+        # or a single .npz file
+        weights_path = Path(weights_path)
+
+        if weights_path.is_dir():
+            # Load from directory of .npy files
+            print("Loading from directory of .npy files...")
+            npy_files = list(weights_path.glob("*.npy"))
+
+            for npy_file in npy_files:
+                # Convert filename back to weight name
+                # e.g., blk_0_attn_q_weight.npy -> blk.0.attn_q.weight
+                # Format: blk_<N>_<type>_<subtype>_weight or token_embd_weight
+                name = npy_file.stem  # Remove .npy
+                parts = name.split('_')
+
+                if parts[0] == 'blk' and len(parts) >= 4:
+                    # blk_0_attn_q_weight -> blk.0.attn_q.weight
+                    layer_num = parts[1]
+                    # Everything between layer num and 'weight' is the tensor name
+                    tensor_parts = parts[2:-1]  # e.g., ['attn', 'q'] or ['ffn', 'down']
+                    tensor_name = '_'.join(tensor_parts)  # e.g., 'attn_q'
+                    name = f"blk.{layer_num}.{tensor_name}.weight"
+                elif parts[0] == 'token' and len(parts) >= 3:
+                    # token_embd_weight -> token_embd.weight
+                    name = f"token_embd.weight"
+                elif parts[0] == 'output' and len(parts) >= 2:
+                    if parts[1] == 'norm':
+                        name = "output_norm.weight"
+                    else:
+                        name = "output.weight"
+                else:
+                    # Fallback: join with dots
+                    name = '.'.join(parts)
+
+                self.weight_names.append(name)
+                # Store file path for lazy loading
+                self.weights[name] = str(npy_file)
+
+            print(f"Found {len(self.weight_names)} weight files")
+            self._load_mode = 'directory'
+
+        else:
+            # Load from .npz file (original mode)
+            data = np.load(str(weights_path), allow_pickle=True, mmap_mode='r')
+            self.weight_names = [k for k in data.files if not k.startswith('__')]
+            self._data = data
+
+            # Try to extract metadata
+            if '__metadata__' in data.files:
+                meta = str(data['__metadata__'])
+                print(f"Metadata: {meta[:200]}...")
+
+            self._load_mode = 'npz'
 
         load_time = time.time() - t0
-        print(f"Found {len(self.weight_names)} tensors (mmap mode) in {load_time:.2f}s")
+        print(f"Found {len(self.weight_names)} tensors in {load_time:.2f}s")
 
         # Detect model architecture from weight names
         self._detect_architecture()
@@ -185,12 +232,21 @@ class NumpyLLM:
 
     def get_weight(self, name):
         """Get weight by name, handling potential missing weights"""
-        # Check cache first
+        # Check cache first - in directory mode, initially stores file paths
         if name in self.weights:
-            return self.weights[name]
+            cached = self.weights[name]
+            # If it's a string, it's a file path - load it
+            if isinstance(cached, str):
+                w = np.load(cached, mmap_mode='r')
+                w = np.array(w)  # Copy from mmap
+                if w.dtype == np.float16:
+                    w = w.astype(np.float32)
+                self.weights[name] = w
+                return w
+            return cached
 
-        # Try to load from mmap'd file
-        if name in self.weight_names:
+        # For npz mode, try to load from mmap'd file
+        if self._load_mode == 'npz' and name in self.weight_names:
             w = np.array(self._data[name])  # Copy from mmap to regular array
             # Convert float16 to float32 for computation
             if w.dtype == np.float16:
@@ -207,11 +263,21 @@ class NumpyLLM:
         ]
         for alt in alt_names:
             if alt in self.weight_names:
-                w = np.array(self._data[alt])
-                if w.dtype == np.float16:
-                    w = w.astype(np.float32)
-                self.weights[alt] = w
-                return w
+                if self._load_mode == 'directory':
+                    cached = self.weights.get(alt)
+                    if isinstance(cached, str):
+                        w = np.load(cached, mmap_mode='r')
+                        w = np.array(w)
+                        if w.dtype == np.float16:
+                            w = w.astype(np.float32)
+                        self.weights[alt] = w
+                        return w
+                else:
+                    w = np.array(self._data[alt])
+                    if w.dtype == np.float16:
+                        w = w.astype(np.float32)
+                    self.weights[alt] = w
+                    return w
         return None
 
     def forward_layer(self, x, layer_idx):
@@ -350,7 +416,7 @@ def main():
     if len(sys.argv) < 2:
         print("Pure NumPy LLM Inference Engine")
         print()
-        print("Usage: python3 numpy_llm.py <weights.npz> [prompt]")
+        print("Usage: python3 numpy_llm.py <weights.npz> [prompt] [max_tokens]")
         print()
         print("Runs transformer inference using only NumPy.")
         print("Designed for PowerPC and big-endian architectures.")
@@ -358,6 +424,7 @@ def main():
 
     weights_path = sys.argv[1]
     prompt = sys.argv[2] if len(sys.argv) > 2 else "Hello"
+    max_tokens = int(sys.argv[3]) if len(sys.argv) > 3 else 16
 
     if not Path(weights_path).exists():
         print(f"Error: Weights file not found: {weights_path}")
@@ -372,7 +439,8 @@ def main():
     print(f"Tokens: {tokens}")
 
     # Generate
-    generated = model.generate(tokens, max_tokens=16, temperature=0.8)
+    print(f"Generating {max_tokens} tokens...")
+    generated = model.generate(tokens, max_tokens=max_tokens, temperature=0.8)
 
     # Decode (placeholder)
     output = simple_detokenize(generated)
