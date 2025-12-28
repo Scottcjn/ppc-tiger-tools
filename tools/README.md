@@ -61,8 +61,25 @@ scp tinyllama-1.1b-q4-be.gguf user@g5-mac:~/models/
 
 | Model Size | Conversion Time |
 |------------|-----------------|
-| 638 MB (TinyLlama Q4) | ~30 seconds |
+| 638 MB (TinyLlama Q4) | ~15 seconds |
 | 4 GB (7B Q4) | ~3 minutes |
+
+### Verified Working (December 2025)
+
+Successfully tested on PowerPC G5 Dual 2.3GHz with llama.cpp b2000:
+
+```
+$ ./main -m tinyllama-1.1b-q4-be.gguf -p "The meaning of life is" -n 32
+
+The meaning of life is to find your purpose, your passion, and live with purpose.
+- Mark Twain I am not interested in money or material possessions...
+
+llama_print_timings:        load time =    4989.12 ms
+llama_print_timings: prompt eval time =   14757.75 ms /     6 tokens (0.41 tokens/s)
+llama_print_timings:        eval time =  196746.44 ms /    31 runs   (0.16 tokens/s)
+```
+
+**First successful LLM inference on PowerPC G5 using GGUF format!**
 
 ### Known Limitations
 

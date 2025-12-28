@@ -283,14 +283,14 @@ class GGUFByteSwapper:
         print()
 
         with open(self.input_path, 'rb') as fin, open(self.output_path, 'wb') as fout:
-            # Read and verify magic
-            magic = self.read_le_u32(fin)
-            if magic != GGUF_MAGIC:
-                raise ValueError(f"Invalid GGUF magic: {hex(magic)}")
+            # Read and verify magic (4 character bytes, NOT an integer)
+            magic = fin.read(4)
+            if magic != b'GGUF':
+                raise ValueError(f"Invalid GGUF magic: {magic}")
 
-            # Write big-endian magic
-            self.write_be_u32(fout, GGUF_MAGIC)
-            print("✓ Magic number")
+            # Write magic as-is (it's a string, not an integer to swap)
+            fout.write(b'GGUF')
+            print("✓ Magic number (GGUF)")
 
             # Read and write version
             version = self.read_le_u32(fin)
