@@ -101,4 +101,106 @@ cd ~/llama.cpp-b2000
 
 Even with byte-swapped GGUF files, llama.cpp needs additional patches for big-endian support. The GGUF loader in llama.cpp assumes little-endian throughout. See the patches directory for compatibility work in progress.
 
+---
+
+## gguf_to_numpy.py
+
+Extracts and dequantizes GGUF model weights to NumPy format (.npy files). NumPy handles endianness automatically, making the weights portable across architectures.
+
+### Usage
+
+```bash
+python3 gguf_to_numpy.py <input.gguf> <output.npz>
+```
+
+### Why This Matters
+
+- GGUF format is little-endian only
+- NumPy's .npy format is endian-safe
+- Extracted weights work on any architecture (x86, ARM, PowerPC)
+
+### Supported Quantization Formats
+
+| Format | Status |
+|--------|--------|
+| F32 | ✅ Full support |
+| F16 | ✅ Full support |
+| Q4_0 | ✅ Dequantized to F32 |
+| Q4_K | ✅ Dequantized to F32 |
+| Q6_K | ✅ Dequantized to F32 |
+
+---
+
+## numpy_llm.py
+
+Pure NumPy LLM inference engine. Runs transformer inference using only NumPy - no llama.cpp, no CUDA, no special dependencies.
+
+### Usage
+
+```bash
+# From .npz file
+python3 numpy_llm.py weights.npz "Hello world" 16
+
+# From directory of .npy files
+python3 numpy_llm.py tinyllama_weights/ "Hello world" 16
+```
+
+### Arguments
+
+- `weights_path`: Path to .npz file or directory of .npy files
+- `prompt`: Input text (default: "Hello")
+- `max_tokens`: Number of tokens to generate (default: 16)
+
+### Features
+
+- GQA (Grouped Query Attention) support
+- RMS Layer Normalization
+- SwiGLU Feed-Forward
+- Memory-mapped weight loading
+- Auto-detects model architecture from weights
+
+### Verified Working (December 2025)
+
+| System | Python | NumPy | Speed |
+|--------|--------|-------|-------|
+| PowerPC G5 (Mac OS X 10.5) | 3.9.18 | 1.24.4 | 0.01 tok/s |
+| PowerPC G4 (Mac OS X 10.4) | 3.8.18 | 1.21.6 | 0.005 tok/s |
+
+**First LLM to run on Mac OS X 10.4 Tiger!**
+
+### Performance Notes
+
+Pure NumPy is ~16x slower than optimized llama.cpp, but:
+- Works on any system with Python + NumPy
+- No compilation required
+- Endianness handled automatically
+- Great for testing and compatibility verification
+
+---
+
+## Workflow: GGUF to PowerPC
+
+1. **Convert GGUF to NumPy weights** (on any machine):
+   ```bash
+   python3 gguf_to_numpy.py tinyllama-1.1b-q4.gguf tinyllama_weights.npz
+   ```
+
+2. **Split for transfer** (if needed for old Macs):
+   ```bash
+   # Extract .npz to directory
+   python3 -c "import numpy as np; d=np.load('weights.npz'); [np.save(f'weights/{k}.npy', d[k]) for k in d.files]"
+   tar czf weights.tar.gz weights/
+   ```
+
+3. **Transfer to PowerPC Mac**:
+   ```bash
+   scp weights.tar.gz user@g4-mac:~/models/
+   ssh user@g4-mac 'cd ~/models && tar xzf weights.tar.gz'
+   ```
+
+4. **Run inference**:
+   ```bash
+   python3 numpy_llm.py ~/models/weights/ "The meaning of life is" 8
+   ```
+
 ## December 2025
