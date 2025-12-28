@@ -400,23 +400,46 @@ class NumpyLLM:
 
 
 def simple_tokenize(text, vocab_size=32000):
-    """Very simple character-level tokenization (placeholder)"""
-    # In real use, you'd load the actual tokenizer
+    """Very simple character-level tokenization (fallback)"""
     tokens = [ord(c) % vocab_size for c in text]
     return tokens
 
 
 def simple_detokenize(tokens):
-    """Simple detokenization (placeholder)"""
-    # This won't produce real text - just for testing
+    """Simple detokenization (fallback)"""
     return ''.join(chr(t % 128) if 32 <= t % 128 < 127 else '?' for t in tokens)
+
+
+def find_tokenizer(weights_path):
+    """Try to find tokenizer.model near the weights"""
+    weights_path = Path(weights_path)
+
+    # Check same directory
+    candidates = [
+        weights_path.parent / "tokenizer.model",
+        weights_path.parent / "tokenizer.json",
+        weights_path.parent.parent / "tokenizer.model",
+        Path.home() / "models" / "tokenizer.model",
+    ]
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    return None
 
 
 def main():
     if len(sys.argv) < 2:
         print("Pure NumPy LLM Inference Engine")
         print()
-        print("Usage: python3 numpy_llm.py <weights.npz> [prompt] [max_tokens]")
+        print("Usage: python3 numpy_llm.py <weights> [prompt] [max_tokens] [tokenizer]")
+        print()
+        print("Arguments:")
+        print("  weights     Path to .npz file or directory of .npy files")
+        print("  prompt      Input text (default: 'Hello')")
+        print("  max_tokens  Number of tokens to generate (default: 16)")
+        print("  tokenizer   Path to tokenizer.model (optional)")
         print()
         print("Runs transformer inference using only NumPy.")
         print("Designed for PowerPC and big-endian architectures.")
@@ -425,6 +448,7 @@ def main():
     weights_path = sys.argv[1]
     prompt = sys.argv[2] if len(sys.argv) > 2 else "Hello"
     max_tokens = int(sys.argv[3]) if len(sys.argv) > 3 else 16
+    tokenizer_path = sys.argv[4] if len(sys.argv) > 4 else None
 
     if not Path(weights_path).exists():
         print(f"Error: Weights file not found: {weights_path}")
@@ -433,17 +457,37 @@ def main():
     # Load model
     model = NumpyLLM(weights_path)
 
+    # Try to load tokenizer
+    tokenizer = None
+    if tokenizer_path is None:
+        tokenizer_path = find_tokenizer(weights_path)
+
+    if tokenizer_path:
+        try:
+            from llama_tokenizer import LlamaTokenizer
+            tokenizer = LlamaTokenizer(tokenizer_path)
+            print(f"Loaded tokenizer: {tokenizer_path} ({tokenizer.vocab_size} tokens)")
+        except Exception as e:
+            print(f"Warning: Could not load tokenizer: {e}")
+            print("Using simple character-level tokenization")
+
     # Tokenize prompt
     print(f"\nPrompt: {prompt}")
-    tokens = simple_tokenize(prompt, model.vocab_size)
+    if tokenizer:
+        tokens = tokenizer.encode(prompt, add_bos=True, add_eos=False)
+    else:
+        tokens = simple_tokenize(prompt, model.vocab_size)
     print(f"Tokens: {tokens}")
 
     # Generate
     print(f"Generating {max_tokens} tokens...")
     generated = model.generate(tokens, max_tokens=max_tokens, temperature=0.8)
 
-    # Decode (placeholder)
-    output = simple_detokenize(generated)
+    # Decode
+    if tokenizer:
+        output = tokenizer.decode(generated)
+    else:
+        output = simple_detokenize(generated)
     print(f"\nGenerated: {output}")
 
 

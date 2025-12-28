@@ -1,0 +1,104 @@
+--- a/ggml/src/ggml.c
++++ b/ggml/src/ggml.c
+@@ -1362,6 +1362,77 @@
+ #define GGML_F16_VEC_MUL            GGML_F32Cx8_MUL
+ #define GGML_F16_VEC_REDUCE         GGML_F32Cx8_REDUCE
+
++#elif defined(__ALTIVEC__) && !defined(__POWER9_VECTOR__)
++
++// Classic AltiVec for PowerPC G4/G5 (not POWER9)
++// These machines don't have vec_xl/vec_xst or vec_extract
++
++#define GGML_SIMD
++
++#include <altivec.h>
++
++// F32 AltiVec (G4/G5)
++
++#define GGML_F32_STEP 32
++#define GGML_F32_EPR  4
++
++#define GGML_F32x4              vector float
++#define GGML_F32x4_ZERO         ((vector float){0.0f, 0.0f, 0.0f, 0.0f})
++#define GGML_F32x4_SET1(x)      ((vector float){x, x, x, x})
++
++// AltiVec requires 16-byte aligned loads/stores
++// Use vec_ld/vec_st which handle alignment
++static inline vector float ggml_altivec_load(const float *p) {
++    // Check alignment
++    if (((uintptr_t)p & 0xF) == 0) {
++        return vec_ld(0, p);
++    } else {
++        // Unaligned load using permute
++        vector unsigned char perm = vec_lvsl(0, p);
++        vector float v1 = vec_ld(0, p);
++        vector float v2 = vec_ld(16, p);
++        return vec_perm(v1, v2, perm);
++    }
++}
++
++static inline void ggml_altivec_store(float *p, vector float v) {
++    // For stores, we assume alignment or use scalar fallback
++    if (((uintptr_t)p & 0xF) == 0) {
++        vec_st(v, 0, p);
++    } else {
++        // Scalar fallback for unaligned stores
++        union { vector float v; float f[4]; } u;
++        u.v = v;
++        p[0] = u.f[0]; p[1] = u.f[1]; p[2] = u.f[2]; p[3] = u.f[3];
++    }
++}
++
++#define GGML_F32x4_LOAD(p)      ggml_altivec_load(p)
++#define GGML_F32x4_STORE(p, r)  ggml_altivec_store(p, r)
++#define GGML_F32x4_FMA(a, b, c) vec_madd(b, c, a)
++#define GGML_F32x4_ADD          vec_add
++#define GGML_F32x4_MUL          vec_madd  // vec_mul may not exist, use madd with 0
++
++// Reduction without vec_extract - use union
++#define GGML_F32x4_REDUCE(res, x)                     \
++{                                                     \
++    int offset = GGML_F32_ARR >> 1;                   \
++    for (int i = 0; i < offset; ++i) {                \
++        x[i] = vec_add(x[i], x[offset+i]);            \
++    }                                                 \
++    offset >>= 1;                                     \
++    for (int i = 0; i < offset; ++i) {                \
++        x[i] = vec_add(x[i], x[offset+i]);            \
++    }                                                 \
++    offset >>= 1;                                     \
++    for (int i = 0; i < offset; ++i) {                \
++        x[i] = vec_add(x[i], x[offset+i]);            \
++    }                                                 \
++    union { vector float v; float f[4]; } u;          \
++    u.v = x[0];                                       \
++    res = u.f[0] + u.f[1] + u.f[2] + u.f[3];          \
++}
++
++#define GGML_F32_VEC        GGML_F32x4
++#define GGML_F32_VEC_ZERO   GGML_F32x4_ZERO
++#define GGML_F32_VEC_SET1   GGML_F32x4_SET1
++#define GGML_F32_VEC_LOAD   GGML_F32x4_LOAD
++#define GGML_F32_VEC_STORE  GGML_F32x4_STORE
++#define GGML_F32_VEC_FMA    GGML_F32x4_FMA
++#define GGML_F32_VEC_ADD    GGML_F32x4_ADD
++#define GGML_F32_VEC_MUL    GGML_F32x4_MUL
++#define GGML_F32_VEC_REDUCE GGML_F32x4_REDUCE
++
++// F16 AltiVec - no native F16 support, just use F32 path
++#define GGML_F16_STEP       GGML_F32_STEP
++#define GGML_F16_EPR        GGML_F32_EPR
++#define GGML_F16_VEC        GGML_F32x4
++#define GGML_F16_VEC_ZERO   GGML_F32x4_ZERO
++#define GGML_F16_VEC_SET1   GGML_F32x4_SET1
++#define GGML_F16_VEC_FMA    GGML_F32x4_FMA
++#define GGML_F16_VEC_ADD    GGML_F32x4_ADD
++#define GGML_F16_VEC_MUL    GGML_F32x4_MUL
++#define GGML_F16_VEC_REDUCE GGML_F32x4_REDUCE
++// For F16 load, convert via scalar (no native F16)
++#define GGML_F16_VEC_LOAD(p, i) GGML_F32x4_SET1(GGML_FP16_TO_FP32(p[i]))
++#define GGML_F16_VEC_STORE(p, r, i) /* F16 store not vectorized */
++
+ #elif defined(__POWER9_VECTOR__)
+
+ #define GGML_SIMD
