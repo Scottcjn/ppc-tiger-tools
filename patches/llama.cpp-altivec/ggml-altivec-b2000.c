@@ -21,11 +21,10 @@ static inline vector float ggml_vec_load_f32(const float *p) {
     if (((unsigned long)p & 0xF) == 0) {
         return vec_ld(0, p);
     } else {
-        // Unaligned load using permute
-        vector unsigned char perm = vec_lvsl(0, p);
-        vector float v1 = vec_ld(0, p);
-        vector float v2 = vec_ld(16, p);
-        return vec_perm(v1, v2, perm);
+        // Scalar fallback for unaligned (safer than vec_perm on some G4s)
+        union { vector float v; float f[4]; } u;
+        u.f[0] = p[0]; u.f[1] = p[1]; u.f[2] = p[2]; u.f[3] = p[3];
+        return u.v;
     }
 }
 
