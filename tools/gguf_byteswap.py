@@ -250,27 +250,72 @@ class GGUFByteSwapper:
         return bytes(result)
 
     def swap_kquant_blocks(self, data, tensor_type):
-        """Swap bytes in K-quant blocks (simplified - scales only)"""
-        # K-quant formats are complex, this handles the main scale values
+        """Swap bytes in K-quant blocks.
+
+        K-quant blocks have f16 scale values that need byte swapping.
+        The quantized values themselves are byte arrays and don't need swapping.
+        """
         result = bytearray(data)
 
-        if tensor_type == GGML_TYPE_Q4_K:
-            # Q4_K block: 2 (f16 d) + 2 (f16 dmin) + 12 (scales) + 128/2 (qs)
+        if tensor_type == GGML_TYPE_Q2_K:
+            # Q2_K: 16(scales) + 16(qs) + 4(d+dmin as f16) = 84 bytes per 256 elements
+            # Actually: scales[16] + qs[64] + d(f16) + dmin(f16) = 84 bytes
+            block_size = 84
+            for i in range(0, len(data), block_size):
+                if i + block_size <= len(data):
+                    # d at offset 80, dmin at offset 82
+                    result[i+80], result[i+81] = result[i+81], result[i+80]  # d
+                    result[i+82], result[i+83] = result[i+83], result[i+82]  # dmin
+
+        elif tensor_type == GGML_TYPE_Q3_K:
+            # Q3_K: hmask[32] + qs[64] + scales[12] + d(f16) = 110 bytes
+            block_size = 110
+            for i in range(0, len(data), block_size):
+                if i + block_size <= len(data):
+                    # d at offset 108
+                    result[i+108], result[i+109] = result[i+109], result[i+108]
+
+        elif tensor_type == GGML_TYPE_Q4_K:
+            # Q4_K: d(f16) + dmin(f16) + scales[12] + qs[128] = 144 bytes
             block_size = 144
             for i in range(0, len(data), block_size):
                 if i + 4 <= len(data):
-                    # Swap d and dmin (f16)
-                    result[i], result[i+1] = result[i+1], result[i]
-                    result[i+2], result[i+3] = result[i+3], result[i+2]
+                    # d at offset 0, dmin at offset 2
+                    result[i], result[i+1] = result[i+1], result[i]      # d
+                    result[i+2], result[i+3] = result[i+3], result[i+2]  # dmin
+
+        elif tensor_type == GGML_TYPE_Q5_K:
+            # Q5_K: d(f16) + dmin(f16) + scales[12] + qh[32] + qs[128] = 176 bytes
+            block_size = 176
+            for i in range(0, len(data), block_size):
+                if i + 4 <= len(data):
+                    # d at offset 0, dmin at offset 2
+                    result[i], result[i+1] = result[i+1], result[i]      # d
+                    result[i+2], result[i+3] = result[i+3], result[i+2]  # dmin
 
         elif tensor_type == GGML_TYPE_Q6_K:
-            # Q6_K block: 128 (ql) + 64 (qh) + 16 (scales) + 2 (f16 d)
+            # Q6_K: ql[128] + qh[64] + scales[16] + d(f16) = 210 bytes
             block_size = 210
             for i in range(0, len(data), block_size):
                 if i + block_size <= len(data):
-                    # Swap d at end (f16)
-                    d_offset = i + 208
-                    result[d_offset], result[d_offset+1] = result[d_offset+1], result[d_offset]
+                    # d at offset 208
+                    result[i+208], result[i+209] = result[i+209], result[i+208]
+
+        elif tensor_type == GGML_TYPE_Q8_K:
+            # Q8_K: d(f32) + qs[256] + bsums[16*2] = 292 bytes
+            # d is f32, not f16!
+            block_size = 292
+            for i in range(0, len(data), block_size):
+                if i + 4 <= len(data):
+                    # d at offset 0 (f32 - 4 byte swap)
+                    result[i], result[i+1], result[i+2], result[i+3] = \
+                        result[i+3], result[i+2], result[i+1], result[i]
+                    # bsums are int16, need to swap each pair at offset 260-291
+                    for j in range(16):
+                        bsum_off = i + 260 + j*2
+                        if bsum_off + 2 <= len(data):
+                            result[bsum_off], result[bsum_off+1] = \
+                                result[bsum_off+1], result[bsum_off]
 
         return bytes(result)
 
@@ -344,31 +389,37 @@ class GGUFByteSwapper:
 
             print(f"  {tensor_count}/{tensor_count} tensor infos read")
 
-            # Write tensor info in big-endian
+            # Write tensor info in big-endian, track offset positions for patching
             print("\nWriting tensor info...")
+            offset_positions = []  # File positions where we wrote each tensor's offset
             for i, info in enumerate(tensor_infos):
                 self.write_string_be(fout, info['name'])
                 self.write_be_u32(fout, info['n_dims'])
                 for d in info['dims']:
                     self.write_be_u64(fout, d)
                 self.write_be_u32(fout, info['type'])
-                self.write_be_u64(fout, info['offset'])
+                # Record position where offset is written, then write placeholder
+                offset_positions.append(fout.tell())
+                self.write_be_u64(fout, 0)  # Placeholder - will patch later
 
             # Align to 32 bytes
             current_pos = fout.tell()
             padding = (32 - (current_pos % 32)) % 32
             fout.write(b'\x00' * padding)
 
-            # Record where tensor data starts
-            tensor_data_start = fout.tell()
+            # Record where tensor data starts in OUTPUT file
+            tensor_data_start_out = fout.tell()
 
-            # Read alignment padding in input
+            # Read alignment padding in input and record where tensor data starts
             fin_pos = fin.tell()
             fin_padding = (32 - (fin_pos % 32)) % 32
             fin.read(fin_padding)
+            tensor_data_start_in = fin.tell()  # THIS is where tensors begin in input
 
             # Calculate tensor sizes and convert tensor data
             print("\nConverting tensor data...")
+            print(f"  Input tensor data starts at: {tensor_data_start_in}")
+            print(f"  Output tensor data starts at: {tensor_data_start_out}")
 
             # Get type sizes for calculating tensor data sizes
             type_sizes = {
@@ -406,8 +457,9 @@ class GGUFByteSwapper:
                 GGML_TYPE_Q8_K: 256,
             }
 
+            # First pass: calculate tensor sizes
+            tensor_sizes = []
             for i, info in enumerate(tensor_infos):
-                # Calculate tensor size
                 n_elements = 1
                 for d in info['dims']:
                     n_elements *= d
@@ -420,27 +472,53 @@ class GGUFByteSwapper:
                     tensor_size = n_elements * type_sizes[ttype]
                 else:
                     tensor_size = n_elements  # Assume 1 byte
+                tensor_sizes.append(tensor_size)
+
+            # Sort tensors by their input offset to read in file order
+            sorted_indices = sorted(range(len(tensor_infos)),
+                                   key=lambda i: tensor_infos[i]['offset'])
+
+            # Track new offsets for output file
+            new_offsets = [0] * len(tensor_infos)
+            current_out_offset = 0
+
+            for sort_idx, i in enumerate(sorted_indices):
+                info = tensor_infos[i]
+                tensor_size = tensor_sizes[i]
+
+                # Seek to tensor position in input file using its offset
+                input_pos = tensor_data_start_in + info['offset']
+                fin.seek(input_pos)
 
                 # Read tensor data
                 tensor_data = fin.read(tensor_size)
+                if len(tensor_data) != tensor_size:
+                    print(f"\n  WARNING: Tensor {info['name']} expected {tensor_size} bytes, got {len(tensor_data)}")
 
                 # Swap bytes
-                swapped_data = self.swap_tensor_data(tensor_data, ttype)
+                swapped_data = self.swap_tensor_data(tensor_data, info['type'])
+
+                # Record new offset (relative to output data section start)
+                new_offsets[i] = current_out_offset
 
                 # Write swapped data
                 fout.write(swapped_data)
+                current_out_offset += len(swapped_data)
 
-                if i % 10 == 0:
-                    progress = (i / tensor_count) * 100
-                    print(f"  {i}/{tensor_count} tensors ({progress:.1f}%)...", end='\r')
+                if sort_idx % 10 == 0:
+                    progress = (sort_idx / tensor_count) * 100
+                    print(f"  {sort_idx}/{tensor_count} tensors ({progress:.1f}%)...", end='\r')
 
             print(f"  {tensor_count}/{tensor_count} tensors converted!")
 
-            # Copy any remaining data
-            remaining = fin.read()
-            if remaining:
-                fout.write(remaining)
-                print(f"  Copied {len(remaining)} bytes of trailing data")
+            # Now go back and patch the tensor offsets in the output file
+            print("\nPatching tensor offsets...")
+            end_pos = fout.tell()
+            for i, new_offset in enumerate(new_offsets):
+                fout.seek(offset_positions[i])
+                self.write_be_u64(fout, new_offset)
+            fout.seek(end_pos)
+            print(f"  Patched {len(new_offsets)} tensor offsets")
 
         output_size = self.output_path.stat().st_size
         print(f"\n✓ Conversion complete!")

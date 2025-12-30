@@ -40,11 +40,19 @@ Two approaches:
 │   │   └── README.md
 │   ├── llama.cpp-b2000/
 │   │   └── leopard_compat.h       # 10.5 compatibility shims
-│   └── llama.cpp-b2000-bigendian/
-│       ├── ggml-bigendian-block.c # Byte-swap code
-│       └── README.md
+│   ├── llama.cpp-b2000-bigendian/
+│   │   ├── ggml-bigendian-block.c # Byte-swap code
+│   │   └── README.md
+│   └── llama.cpp-q1_58/
+│       └── ggml-q1_58-altivec.h   # Q1.58 ternary quantization for AltiVec
+├── tools/
+│   ├── gguf_byteswap.py           # LE→BE model converter
+│   ├── gguf_to_q1_58.py           # Q4_K→Q1.58 BitNet converter
+│   └── gguf_compare.py            # Tensor comparison tool
 └── docs/
-    └── LLAMA_CPP_PPC_SDK.md       # This file
+    ├── LLAMA_CPP_PPC_SDK.md           # This file
+    ├── BIG_ENDIAN_DEBUG_GUIDE.md      # Deep debugging guide for BE issues
+    └── BITNET_PPC_IMPLEMENTATION.md   # Q1.58 ternary quantization guide
 ```
 
 ### On G4 Mac (192.168.0.125)
@@ -390,5 +398,45 @@ G4 has limited RAM. Use smaller models:
 - TinyLlama 1.1B Q4: 636 MiB (works)
 - Llama 7B Q4: ~4 GB (may work on G5)
 - Larger models: Use numpy_llm.py with mmap
+
+## Q1.58 (BitNet) Ternary Quantization
+
+**NEW**: Q1.58 quantization eliminates ALL floating-point multiplication, making it ideal for PowerPC G4/G5.
+
+### Why Q1.58 is Perfect for PowerPC
+
+| Feature | Benefit for G4/G5 |
+|---------|-------------------|
+| Ternary weights {-1, 0, +1} | Integer add/sub only - no FP multiply |
+| 2.1x smaller than Q4_K | More weights fit in 256KB L2 cache |
+| Zero sparsity | ~30% of weights are zero - skip entirely |
+| AltiVec integer SIMD | 16 int8 operations per cycle |
+
+### Model Size Comparison (TinyLlama 1.1B)
+
+| Format | Size | Fits in G4 RAM? | Speed Estimate |
+|--------|------|-----------------|----------------|
+| FP16 | 2.2 GB | No | N/A |
+| Q4_K | 638 MB | Barely | 0.06 t/s |
+| **Q1_58** | **300 MB** | **Yes** | **0.2-0.3 t/s** |
+
+### Conversion
+
+```bash
+# Convert Q4_K model to Q1.58 ternary
+python3 tools/gguf_to_q1_58.py tinyllama-q4.gguf tinyllama-q1_58.gguf
+
+# For big-endian PowerPC
+python3 tools/gguf_to_q1_58.py tinyllama-q4.gguf tinyllama-q1_58-BE.gguf --big-endian
+```
+
+### Integration
+
+See `patches/llama.cpp-q1_58/ggml-q1_58-altivec.h` for:
+- AltiVec-optimized ternary unpacking using `vec_perm`
+- Integer-only dot product using `vec_msum`
+- Full Q1.58 dequantization and matmul
+
+Full implementation guide: `docs/BITNET_PPC_IMPLEMENTATION.md`
 
 ## December 2025
