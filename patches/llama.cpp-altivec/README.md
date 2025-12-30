@@ -76,10 +76,16 @@ $CXX -maltivec -O3 -mcpu=7450 -std=gnu++11 -c llama.cpp -o llama.o -I.
 
 ## Known Issues
 
-**llama.cpp-b2000 crashes on PowerPC** (Dec 2025):
-- Both AltiVec and scalar builds crash at `ggml_compute_forward_mul`
-- This is a llama.cpp-b2000 bug, NOT an AltiVec issue
-- Crashes at address 0x1b299580 with KERN_INVALID_ADDRESS
-- Alternative: Use `numpy_llm.py` which works at ~0.005 tok/s
+**FIXED: llama.cpp-b2000 crash on PowerPC** (Dec 2025):
+- ~~Both AltiVec and scalar builds crash at `ggml_compute_forward_mul`~~
+- **Root cause found**: GGUF files are little-endian, PowerPC is big-endian
+- **Solution**: Convert models with `gguf_byteswap.py` (see `../llama.cpp-b2000-bigendian/`)
+- With byte-swapped models, inference now works at ~0.06-0.12 tok/s on G4
+
+## Prerequisites
+
+Before using AltiVec patches, ensure you have:
+1. Big-endian converted GGUF model (use `tools/gguf_byteswap.py`)
+2. Or apply the runtime byte-swapping patch (see `../llama.cpp-b2000-bigendian/`)
 
 ## December 2025
