@@ -183,10 +183,10 @@ to plot a dashed line (using the ``'--'`` line style). See the
    this is optional.
 
 The graph has a strange shape from January 24th to February 1st. It would be
-interesing to know where this data comes from. If we look at the ``locations``
+interesting to know where this data comes from. If we look at the ``locations``
 array we extracted from the ``.csv`` file, we can see that we have two columns,
 where the first would contain regions and the second would contain the name of
-the country. However, only the first few rows contain data for the the first
+the country. However, only the first few rows contain data for the first
 column (province names in China). Following that, we only have country names. So
 it would make sense to group all the data from China into a single row. For
 this, we'll select from the ``nbcases`` array only the rows for which the
