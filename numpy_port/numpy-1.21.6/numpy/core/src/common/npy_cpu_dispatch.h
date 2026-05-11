@@ -57,7 +57,7 @@
  * avoid linking duplications due to the nature of the dispatch-able sources.
  *
  * Example:
- *    @targets baseline avx avx512_skx vsx3 asimdhp // configration statments
+ *    @targets baseline avx avx512_skx vsx3 asimdhp // configuration statements
  *
  *    void NPY_CPU_DISPATCH_CURFX(dispatch_me)(const int *src, int *dst)
  *    {
@@ -123,8 +123,8 @@
  * declarations for the exported variables and functions that defined inside
  * the dispatch-able sources.
  *
- * The first argument should ends with the exported function or variable name,
- * while the Macro pasting the extra arguments.
+ * The first argument should end with the exported function or variable name,
+ * while the macro pastes the extra arguments.
  *
  * Examples:
  *    #ifndef NPY_DISABLE_OPTIMIZATION
@@ -137,7 +137,7 @@
  * By assuming the provided config header derived from a dispatch-able source,
  * that configured with "@targets baseline sse41 vsx3 asimdhp",
  * they supported by the compiler and enabled via '--cpu-dspatch',
- * then the prototype declrations at the above example will equivalent to the follows:
+ * then the prototype declarations at the above example will be equivalent to the following:
  *
  * - x86:
  *      void dispatch_me(const int*, int*); // baseline
@@ -180,23 +180,23 @@
  * Macro NPY_CPU_DISPATCH_DECLARE_XB(LEFT, ...)
  *
  * Same as `NPY_CPU_DISPATCH_DECLARE` but exclude the baseline declaration even
- * if it was provided within the configration statments.
+ * if it was provided within the configuration statements.
  */
 #define NPY_CPU_DISPATCH_DECLARE_XB(...) \
     NPY__CPU_DISPATCH_CALL(NPY_CPU_DISPATCH_DECLARE_CHK_, NPY_CPU_DISPATCH_DECLARE_CB_, __VA_ARGS__)
 /**
  * Macro NPY_CPU_DISPATCH_CALL(LEFT, ...) is used for runtime dispatching
  * of the exported functions and variables within the dispatch-able sources
- * according to the highested interesed CPU features that supported by the
+ * according to the highest-priority requested CPU features supported by the
  * running machine depending on the required optimizations.
  *
- * The first argument should ends with the exported function or variable name,
- * while the Macro pasting the extra arguments.
+ * The first argument should end with the exported function or variable name,
+ * while the macro pastes the extra arguments.
  *
  * Example:
  *  Assume we have a dispatch-able source exporting the following function:
  *
- *    @targets baseline avx2 avx512_skx // configration statments
+ *    @targets baseline avx2 avx512_skx // configuration statements
  *
  *    void NPY_CPU_DISPATCH_CURFX(dispatch_me)(const int *src, int *dst)
  *    {
@@ -238,7 +238,7 @@
  * Macro NPY_CPU_DISPATCH_CALL_XB(LEFT, ...)
  *
  * Same as `NPY_CPU_DISPATCH_DECLARE` but exclude the baseline declaration even
- * if it was provided within the configration statements.
+ * if it was provided within the configuration statements.
  * Returns void.
  */
 #define NPY_CPU_DISPATCH_CALL_XB_CB_(TESTED_FEATURES, TARGET_NAME, LEFT, ...) \
