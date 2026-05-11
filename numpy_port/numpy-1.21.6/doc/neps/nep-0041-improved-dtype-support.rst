@@ -765,7 +765,7 @@ Discussion
 See :ref:`NEP 40 <NEP40>`
 for a list of previous meetings and discussions.
 
-Additional discussion around this specific NEP has occured on both
+Additional discussion around this specific NEP has occurred on both
 the mailing list and the pull request:
 
 * `Mailing list discussion <https://mail.python.org/pipermail/numpy-discussion/2020-March/080481.html>`_
