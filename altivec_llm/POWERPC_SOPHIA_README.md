@@ -330,9 +330,9 @@ ensemble_gist = np.mean(gists, axis=0)
 
 ## 📚 Further Reading
 
-- [Original AltiVec Quantum Research](../quantum_vec_perm_paper.md)
-- [Non-Bijective Permutations](../ai_truth_standard/quantum_altivec_permutes.md)
-- [RustChain Mining on PowerPC](../RUSTCHAIN_ACTUAL_STATUS.md)
+- [AltiVec SIMD support](../docs/LLAMA_CPP_PPC_SDK.md#altivec-simd-support)
+- [BitNet PowerPC AltiVec implementation](../docs/BITNET_PPC_IMPLEMENTATION.md#altivec-implementation)
+- [RustChain mining on PowerPC](../README.md#crypto--mining-python-23-compatible)
 
 ---
 
