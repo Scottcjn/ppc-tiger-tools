@@ -22,13 +22,13 @@ different capabilities without recompiling.
 
 We have a mechanism in the ufunc machinery to `build alternative loops`_
 indexed by CPU feature name. At import (in ``InitOperators``), the loop
-function that matches the run-time CPU info `is chosen`_ from the candidates.This
+function that matches the run-time CPU info `is chosen`_ from the candidates. This
 NEP proposes a mechanism to build on that for many more features and
 architectures.  The steps proposed are to:
 
-- Establish a set of well-defined, architecture-agnostic, universal intrisics
+- Establish a set of well-defined, architecture-agnostic, universal intrinsics
   which capture features available across architectures.
-- Capture these universal intrisics in a set of C macros and use the macros
+- Capture these universal intrinsics in a set of C macros and use the macros
   to build code paths for sets of features from the baseline up to the maximum
   set of features available on that architecture. Offer these as a limited
   number of compiled alternative code paths.
@@ -64,7 +64,7 @@ mechanism for NumPy. There are three stages to using the mechanism:
 - Infrastructure is provided in the code for abstract intrinsics. The ufunc
   machinery will be extended using sets of these abstract intrinsics, so that
   a single ufunc will be expressed as a set of loops, going from a minimal to
-  a maximal set of possibly availabe intrinsics.
+  a maximal set of possibly available intrinsics.
 - At compile time, compiler macros and CPU detection are used to turn the
   abstract intrinsics into concrete intrinsic calls. Any intrinsics not
   available on the platform, either because the CPU does not support them
@@ -153,7 +153,7 @@ SIMD loops for many ufuncs. These would likely be the first candidates
 to be ported to universal intrinsics. The expectation is that the new
 implementation may cause a regression in benchmarks, but not increase the
 size of the binary. If the regression is not minimal, we may choose to keep
-the X86-specific code for that platform and use the universal intrisic code
+the X86-specific code for that platform and use the universal intrinsic code
 for other platforms.
 
 Any new PRs to implement ufuncs using intrinsics will be expected to use the
@@ -183,7 +183,7 @@ yet supported as a universal intrinsic, then:
 1. It should be added as a universal intrinsic for all platforms
 2. If it does not have an equivalent instruction on other platforms (e.g.
    ``_mm512_mask_i32gather_ps`` in ``AVX512``), then no universal intrinsic
-   should be added and a platform-specific ``ufunc`` or a short helper fuction
+   should be added and a platform-specific ``ufunc`` or a short helper function
    should be written instead. If such a helper function is used, it must be
    wrapped with the feature macros, and a reasonable non-intrinsic fallback to
    be used by default.
@@ -208,7 +208,7 @@ There should be no impact on backwards compatibility.
 Detailed description
 --------------------
 
-The CPU-specific are mapped to unversal intrinsics which are
+The CPU-specific are mapped to universal intrinsics which are
 similar for all x86 SIMD variants, ARM SIMD variants etc. For example, the
 NumPy universal intrinsic ``npyv_load_u32`` maps to:
 
@@ -289,7 +289,7 @@ implementing and maintaining that platform's loop code.
 Discussion
 ----------
 
-Most of the discussion took place on the PR `gh-15228`_ to accecpt this NEP.
+Most of the discussion took place on the PR `gh-15228`_ to accept this NEP.
 Discussion on the mailing list mentioned `VOLK`_ which was added to
 the section on related work. The question of maintainability also was raised
 both on the mailing list and in `gh-15228`_ and resolved as follows:
