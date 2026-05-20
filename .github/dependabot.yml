@@ -1,7 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/numpy_port/numpy-1.21.6"
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -10,16 +10,4 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "python"
-
-  - package-ecosystem: "pip"
-    directory: "/numpy_port/numpy-2.2.6"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "python"
+      - "github-actions"
