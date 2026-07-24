@@ -241,11 +241,32 @@ class GGUFByteSwapper:
                 result[i], result[i+1] = result[i+1], result[i]
                 result[i+2], result[i+3] = result[i+3], result[i+2]
 
+        elif tensor_type == GGML_TYPE_Q5_0:
+            # Block size: 2 (f16 scale) + 4 (qh bit-mask) + 16 (weights) = 22 bytes
+            # qh/qs are byte arrays; only the f16 scale needs swapping.
+            block_size = 22
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+
+        elif tensor_type == GGML_TYPE_Q5_1:
+            # Block size: 2 (f16 scale) + 2 (f16 min) + 4 (qh) + 16 (weights) = 24 bytes
+            block_size = 24
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+                result[i+2], result[i+3] = result[i+3], result[i+2]
+
         elif tensor_type == GGML_TYPE_Q8_0:
             # Block size: 2 (f16 scale) + 32 (weights) = 34 bytes
             block_size = 34
             for i in range(0, len(data), block_size):
                 result[i], result[i+1] = result[i+1], result[i]
+
+        elif tensor_type == GGML_TYPE_Q8_1:
+            # Block size: 2 (f16 scale) + 2 (f16 sum) + 32 (weights) = 36 bytes
+            block_size = 36
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+                result[i+2], result[i+3] = result[i+3], result[i+2]
 
         return bytes(result)
 
