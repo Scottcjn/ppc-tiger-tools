@@ -67,6 +67,38 @@ class TestQuantScaleSwap(unittest.TestCase):
                 self.assertEqual(out[weight_start], 0xFF, f"{name} weights corrupted")
                 self.assertEqual(len(out), 2 * size, f"{name} length changed")
 
+    def test_q5_qh_bitmask_is_byte_swapped(self):
+        """Q5_0/Q5_1's qh field is not a byte array like qs -- ggml reads it
+        with memcpy(&qh, block->qh, sizeof(qh)) into a uint32_t and then
+        bit-shifts per weight. On a big-endian target that memcpy
+        reinterprets the 4 raw bytes as big-endian, so unless we swap them
+        here too, every weight in the block picks up the wrong 5th bit.
+        Q8_1 has no qh field (d + s + qs only) and is deliberately excluded.
+        """
+        cases = [
+            ("Q5_0", g.GGML_TYPE_Q5_0, 22, 2),   # qh at offset 2 (no min field)
+            ("Q5_1", g.GGML_TYPE_Q5_1, 24, 4),   # qh at offset 4 (after d + m)
+        ]
+        for name, ttype, size, qh_off in cases:
+            with self.subTest(quant=name):
+                b = bytearray(size)
+                b[qh_off:qh_off + 4] = bytes([0x11, 0x22, 0x33, 0x44])
+                qs_off = qh_off + 4
+                for k in range(qs_off, size):
+                    b[k] = 0xAA  # qs weight nibbles: must never move
+                data = bytes(b)
+
+                out = self.sw.swap_tensor_data(data, ttype)
+
+                self.assertEqual(
+                    out[qh_off:qh_off + 4], bytes([0x44, 0x33, 0x22, 0x11]),
+                    f"{name} qh bitmask not byte-swapped",
+                )
+                self.assertEqual(
+                    out[qs_off:size], b"\xaa" * (size - qs_off),
+                    f"{name} qs weight bytes must stay untouched",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
