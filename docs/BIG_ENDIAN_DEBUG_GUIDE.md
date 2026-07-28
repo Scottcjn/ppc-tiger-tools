@@ -184,7 +184,7 @@ This IEEE 754 trick should work on BE, but worth verifying.
 
 ```bash
 # SSH to G4
-sshpass -p 'Elyanlabs12@' ssh -o HostKeyAlgorithms=+ssh-rsa sophia@192.168.0.125
+sshpass -p '$PPC_SSH_PASS' ssh -o HostKeyAlgorithms=+ssh-rsa sophia@192.168.0.125
 
 # Check compiler defines
 gcc-7 -dM -E - < /dev/null | grep -i "endian\|power\|ppc"
