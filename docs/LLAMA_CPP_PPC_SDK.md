@@ -73,7 +73,7 @@ Two approaches:
 
 ### SSH to G4
 ```bash
-sshpass -p 'Elyanlabs12@' ssh -o StrictHostKeyChecking=no g4-mirror
+sshpass -p '$PPC_SSH_PASS' ssh -o StrictHostKeyChecking=no g4-mirror
 # Or use host alias from ~/.ssh/config
 ```
 
