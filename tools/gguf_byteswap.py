@@ -241,11 +241,40 @@ class GGUFByteSwapper:
                 result[i], result[i+1] = result[i+1], result[i]
                 result[i+2], result[i+3] = result[i+3], result[i+2]
 
+        elif tensor_type == GGML_TYPE_Q5_0:
+            # Block size: 2 (f16 scale) + 4 (qh bit-mask) + 16 (weights) = 22 bytes
+            # qs is a raw nibble byte array and doesn't need swapping, but qh
+            # is NOT a byte array in practice: ggml reads it with
+            # memcpy(&qh, x->qh, sizeof(qh)) into a uint32_t and then
+            # bit-shifts per weight. On a big-endian reader that memcpy
+            # reinterprets the 4 bytes as big-endian, so unless we swap them
+            # here too, every weight picks up the wrong 5th bit.
+            block_size = 22
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+                result[i+2:i+6] = self.swap32(bytes(result[i+2:i+6]))
+
+        elif tensor_type == GGML_TYPE_Q5_1:
+            # Block size: 2 (f16 scale) + 2 (f16 min) + 4 (qh) + 16 (weights) = 24 bytes
+            # Same qh-is-a-uint32_t reasoning as Q5_0 above.
+            block_size = 24
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+                result[i+2], result[i+3] = result[i+3], result[i+2]
+                result[i+4:i+8] = self.swap32(bytes(result[i+4:i+8]))
+
         elif tensor_type == GGML_TYPE_Q8_0:
             # Block size: 2 (f16 scale) + 32 (weights) = 34 bytes
             block_size = 34
             for i in range(0, len(data), block_size):
                 result[i], result[i+1] = result[i+1], result[i]
+
+        elif tensor_type == GGML_TYPE_Q8_1:
+            # Block size: 2 (f16 scale) + 2 (f16 sum) + 32 (weights) = 36 bytes
+            block_size = 36
+            for i in range(0, len(data), block_size):
+                result[i], result[i+1] = result[i+1], result[i]
+                result[i+2], result[i+3] = result[i+3], result[i+2]
 
         return bytes(result)
 
